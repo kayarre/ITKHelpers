@@ -1,7 +1,7 @@
 project(ITKHelpers)
 SET(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.0)
 
 # Only include Helpers if it is not already available
 if(NOT TARGET Helpers)
