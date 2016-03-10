@@ -20,7 +20,7 @@
 #define ITKTypeTraits_H
 
 // Submodules
-#include <Helpers/TypeTraits.h>
+#include "Helpers/TypeTraits.h"
 
 // ITK
 #include "itkCovariantVector.h"

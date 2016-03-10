@@ -303,7 +303,11 @@ std::vector<itk::Index<2> > Get8NeighborsInRegion(const itk::ImageRegion<2>& reg
     itk::Index<2> index = pixel + offset;
     if(region.IsInside(index))
     {
+    itk::Index<2> index = pixel + neighborOffsets[i];
+    if(region.IsInside(index))
+      {
       neighborsInRegion.push_back(index);
+      }
     }
   }
   return neighborsInRegion;
@@ -398,7 +402,7 @@ std::vector<itk::Index<2> > GetBoundaryPixels(const itk::ImageRegion<2>& region,
   while(!imageIterator.IsAtEnd())
   {
     if( (std::abs(imageIterator.GetIndex()[0] - region.GetIndex()[0]) < static_cast<itk::Index<2>::IndexValueType>(thickness)) ||
-		(std::abs(imageIterator.GetIndex()[0] - (region.GetIndex()[0] + static_cast<itk::Index<2>::IndexValueType>(region.GetSize()[0]) - 1)) < static_cast<itk::Index<2>::IndexValueType>(thickness)) ||
+	(std::abs(imageIterator.GetIndex()[0] - (region.GetIndex()[0] + static_cast<itk::Index<2>::IndexValueType>(region.GetSize()[0]) - 1)) < static_cast<itk::Index<2>::IndexValueType>(thickness)) ||
         (std::abs(imageIterator.GetIndex()[1] - region.GetIndex()[1]) < static_cast<itk::Index<2>::IndexValueType>(thickness)) ||
         (std::abs(imageIterator.GetIndex()[1] - (region.GetIndex()[1] + static_cast<itk::Index<2>::IndexValueType>(region.GetSize()[1]) - 1)) < static_cast<itk::Index<2>::IndexValueType>(thickness)))
     {
@@ -508,7 +512,7 @@ std::vector<itk::Index<2> > DilatePixelList(const std::vector<itk::Index<2> >& p
 
   typedef std::vector<itk::Index<2> > PixelVectorType;
 
-  for(auto iter = pixelList.begin(); iter != pixelList.end(); ++iter)
+  for(PixelVectorType::const_iterator iter = pixelList.begin(); iter != pixelList.end(); ++iter)
   {
     // Note, this must be 255, not just any non-zero number, for BinaryDilateImageFilter to work properly.
     image->SetPixel(*iter, 255);
