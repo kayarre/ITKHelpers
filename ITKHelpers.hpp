@@ -57,8 +57,8 @@
 #include "itkVectorIndexSelectionCastImageFilter.h"
 
 // Submodules
-#include <Helpers/Helpers.h>
-#include <Helpers/Statistics.h>
+#include "Helpers/Helpers.h"
+#include "Helpers/Statistics.h"
 
 // Custom
 #include "itkRGBToLabColorSpacePixelAccessor.h"
@@ -983,7 +983,7 @@ void StackImages(const typename itk::VectorImage<TPixel, 2>* const image1,
                  const typename itk::VectorImage<TPixel, 2>* const image2,
                  typename itk::VectorImage<TPixel, 2>* const output)
 {
-  typedef typename itk::VectorImage<TPixel, 2> VectorImageType;
+  //typedef typename itk::VectorImage<TPixel, 2> VectorImageType;
   typedef typename itk::Image<TPixel, 2> ScalarImageType;
 
   if(image1->GetLargestPossibleRegion() != image2->GetLargestPossibleRegion())
@@ -1348,7 +1348,7 @@ void SubtractRegions(const TImage* const image1, const itk::ImageRegion<2>& regi
     float difference = image1Iterator.Get() - image2Iterator.Get();
     itk::Index<2> index = Helpers::ConvertFrom<itk::Index<2>, itk::Offset<2> >
                           (image1Iterator.GetIndex() - image1->GetLargestPossibleRegion().GetIndex());
-    output.SetPixel(index, difference);
+    output->SetPixel(index, difference);
     ++image1Iterator;
     ++image2Iterator;
     }

@@ -23,7 +23,7 @@
 
 // Submodules
 class Mask;
-#include <Helpers/TypeTraits.h>
+#include "Helpers/TypeTraits.h"
 
 // STL
 #include <string>

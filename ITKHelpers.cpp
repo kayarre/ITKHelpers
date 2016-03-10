@@ -390,10 +390,10 @@ std::vector<itk::Index<2> > GetBoundaryPixels(const itk::ImageRegion<2>& region,
 
   while(!imageIterator.IsAtEnd())
   {
-    if( (abs(imageIterator.GetIndex()[0] - region.GetIndex()[0]) < static_cast<itk::Index<2>::IndexValueType>(thickness)) ||
-        (abs(imageIterator.GetIndex()[0] - (region.GetIndex()[0] + region.GetSize()[0] - 1)) < static_cast<itk::Index<2>::IndexValueType>(thickness)) ||
-        (abs(imageIterator.GetIndex()[1] - region.GetIndex()[1]) < static_cast<itk::Index<2>::IndexValueType>(thickness)) ||
-        (abs(imageIterator.GetIndex()[1] - (region.GetIndex()[1] + region.GetSize()[1] - 1)) < static_cast<itk::Index<2>::IndexValueType>(thickness)))
+    if( (labs(imageIterator.GetIndex()[0] - region.GetIndex()[0]) < static_cast<itk::Index<2>::IndexValueType>(thickness)) ||
+        ((imageIterator.GetIndex()[0] - (region.GetIndex()[0] + region.GetSize()[0] - 1)) < static_cast<itk::Index<2>::IndexValueType>(thickness)) ||
+        (labs(imageIterator.GetIndex()[1] - region.GetIndex()[1]) < static_cast<itk::Index<2>::IndexValueType>(thickness)) ||
+        ((imageIterator.GetIndex()[1] - (region.GetIndex()[1] + region.GetSize()[1] - 1)) < static_cast<itk::Index<2>::IndexValueType>(thickness)))
     {
       boundaryPixels.push_back(imageIterator.GetIndex());
     }

@@ -48,7 +48,7 @@ void TestUnsignedCharCovariantVector()
   v.Fill(0);
   //std::cout << v << std::endl;
 
-  TypeTraits<itk::CovariantVector<unsigned char, 3> >::ComponentType c = 2.3f;
+  TypeTraits<itk::CovariantVector<unsigned char, 3> >::ComponentType c = 2;
   std::cout << static_cast<float>(c) << std::endl;
 
   TypeTraits<itk::CovariantVector<unsigned char, 3> >::LargerComponentType larger = 2.3f;
