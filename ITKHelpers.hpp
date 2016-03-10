@@ -983,7 +983,7 @@ void StackImages(const typename itk::VectorImage<TPixel, 2>* const image1,
                  const typename itk::VectorImage<TPixel, 2>* const image2,
                  typename itk::VectorImage<TPixel, 2>* const output)
 {
-  //typedef typename itk::VectorImage<TPixel, 2> VectorImageType;
+  typedef typename itk::VectorImage<TPixel, 2> VectorImageType;
   typedef typename itk::Image<TPixel, 2> ScalarImageType;
 
   if(image1->GetLargestPossibleRegion() != image2->GetLargestPossibleRegion())
@@ -1348,7 +1348,7 @@ void SubtractRegions(const TImage* const image1, const itk::ImageRegion<2>& regi
     float difference = image1Iterator.Get() - image2Iterator.Get();
     itk::Index<2> index = Helpers::ConvertFrom<itk::Index<2>, itk::Offset<2> >
                           (image1Iterator.GetIndex() - image1->GetLargestPossibleRegion().GetIndex());
-    output->SetPixel(index, difference);
+    output.SetPixel(index, difference);
     ++image1Iterator;
     ++image2Iterator;
     }
@@ -1472,15 +1472,19 @@ template<typename TImage>
 std::vector<typename TImage::PixelType> GetPixelValuesInRegion(const TImage* const image,
                                                                const itk::ImageRegion<2>& region)
 {
-  std::vector<typename TImage::PixelType> values;
+  assert(image->GetLargestPossibleRegion().IsInside(region));
+
+  std::vector<typename TImage::PixelType> values(region.GetNumberOfPixels());
 
   itk::ImageRegionConstIterator<TImage> imageIterator(image, region);
 
+  unsigned int counter = 0;
   while(!imageIterator.IsAtEnd())
-    {
-    values.push_back(imageIterator.Get());
+  {
+    values[counter] = imageIterator.Get();
+    counter++;
     ++imageIterator;
-    }
+  }
 
   return values;
 }
@@ -1522,13 +1526,79 @@ void SetChannel(TVectorImage* const vectorImage, const unsigned int channel, con
   itk::ImageRegionIterator<TVectorImage> outputIterator(vectorImage, vectorImage->GetLargestPossibleRegion());
 
   while(!inputIterator.IsAtEnd())
-    {
+  {
     typename TVectorImage::PixelType pixel = outputIterator.Get();
     pixel[channel] = inputIterator.Get();
     outputIterator.Set(pixel);
     ++inputIterator;
     ++outputIterator;
+  }
+}
+
+template<typename TInputImage, typename TOutputImage>
+void ConvertTo3Channel(const TInputImage* const image, TOutputImage* const output)
+{
+  output->SetRegions(image->GetLargestPossibleRegion());
+  output->Allocate();
+
+  for(unsigned int channel = 0; channel < 3; ++channel)
+  {
+    SetChannel(output, channel, image);
+  }
+}
+
+template<typename TInputPixel, typename TOutputPixel, unsigned int NComponents>
+void ConvertTo3Channel(const itk::Image<itk::CovariantVector<TInputPixel, NComponents> >* const image,
+                       itk::Image<itk::CovariantVector<TOutputPixel, 3> >* const output)
+{
+  typedef itk::Image<itk::CovariantVector<TInputPixel, NComponents> > InputImageType;
+  typedef itk::Image<itk::CovariantVector<TOutputPixel, 3> > OutputImageType;
+
+  if(image->GetNumberOfComponentsPerPixel() == 3)
+  {
+    DeepCopy(image,output);
+    return;
+  }
+  else if(image->GetNumberOfComponentsPerPixel() > 3)
+  {
+    output->SetRegions(image->GetLargestPossibleRegion());
+    output->Allocate();
+    for(unsigned int channel = 0; channel < 3; ++channel)
+    {
+      typedef itk::Image<typename OutputImageType::PixelType::ComponentType, 2> OutputChannelType;
+      typename OutputChannelType::Pointer outputComponent =
+          OutputChannelType::New();
+      outputComponent->SetRegions(image->GetLargestPossibleRegion());
+      outputComponent->Allocate();
+      ExtractChannel(image, channel, outputComponent.GetPointer());
+
+      SetChannel(output, channel, outputComponent.GetPointer());
     }
+  }
+  else if(image->GetNumberOfComponentsPerPixel() == 1)
+  {
+    output->SetRegions(image->GetLargestPossibleRegion());
+    output->Allocate();
+
+    typedef itk::Image<typename OutputImageType::PixelType::ComponentType, 2> OutputChannelType;
+    typename OutputChannelType::Pointer outputComponent =
+        OutputChannelType::New();
+    outputComponent->SetRegions(image->GetLargestPossibleRegion());
+    outputComponent->Allocate();
+    ExtractChannel(image, 0, outputComponent.GetPointer());
+
+    for(unsigned int channel = 0; channel < 3; ++channel)
+    {
+      SetChannel(output, channel, outputComponent.GetPointer());
+    }
+  }
+  else
+  {
+    std::stringstream ss;
+    ss << "ConvertTo3Channel(): Not sure what to do with an image with "
+       << image->GetNumberOfComponentsPerPixel() << " channels!";
+    throw std::runtime_error(ss.str());
+  }
 }
 
 template<typename TPixel>
@@ -1548,14 +1618,14 @@ void ConvertTo3Channel(const itk::VectorImage<TPixel, 2>* const image,
     output->SetNumberOfComponentsPerPixel(3);
     output->Allocate();
     for(unsigned int channel = 0; channel < 3; ++channel)
-      {
+    {
       typename itk::Image<TPixel, 2>::Pointer outputComponent = itk::Image<TPixel, 2>::New();
       outputComponent->SetRegions(image->GetLargestPossibleRegion());
       outputComponent->Allocate();
       ExtractChannel(image, channel, outputComponent.GetPointer());
 
       SetChannel(output, channel, outputComponent.GetPointer());
-      }
+    }
   }
   else if(image->GetNumberOfComponentsPerPixel() == 1)
   {
@@ -1563,26 +1633,15 @@ void ConvertTo3Channel(const itk::VectorImage<TPixel, 2>* const image,
     output->SetNumberOfComponentsPerPixel(3);
     output->Allocate();
 
-    typedef itk::Image<TPixel, 2> ScalarImageType;
-    typename ScalarImageType::Pointer outputComponent = ScalarImageType::New();
+    typename itk::Image<TPixel, 2>::Pointer outputComponent = itk::Image<TPixel, 2>::New();
     outputComponent->SetRegions(image->GetLargestPossibleRegion());
     outputComponent->Allocate();
     ExtractChannel(image, 0, outputComponent.GetPointer());
 
-    itk::ImageRegionConstIterator<ScalarImageType> inputIterator(outputComponent, outputComponent->GetLargestPossibleRegion());
-    itk::ImageRegionIterator<ImageType> outputIterator(output, output->GetLargestPossibleRegion());
-
-    while(!inputIterator.IsAtEnd())
-      {
-      // Copy the first (only) channel of the input to the output
-      typename ImageType::PixelType pixel = outputIterator.Get();
-      pixel[0] = inputIterator.Get();
-      pixel[1] = inputIterator.Get();
-      pixel[2] = inputIterator.Get();
-      outputIterator.Set(pixel);
-      ++inputIterator;
-      ++outputIterator;
-      }
+    for(unsigned int channel = 0; channel < 3; ++channel)
+    {
+      SetChannel(output, channel, outputComponent.GetPointer());
+    }
   }
   else
   {
@@ -1609,7 +1668,7 @@ void ScaleTo255(TImage* const image)
 template<typename TImage>
 void ScaleAllChannelsTo255(TImage* const image)
 {
-  typedef itk::Image<typename TImage::InternalPixelType, 2> ScalarImageType;
+  typedef itk::Image<typename TImage::PixelType::ComponentType, 2> ScalarImageType;
   for(unsigned int channel = 0; channel < image->GetNumberOfComponentsPerPixel(); ++channel)
   {
     typename ScalarImageType::Pointer outputComponent = ScalarImageType::New();
@@ -1692,13 +1751,10 @@ void WriteImage(const TImage* const image, const std::string& filename)
   }
 }
 
-
-template<typename TImage>
-void WriteRGBImage(const TImage* const input, const std::string& filename)
+template <typename TImage>
+void WriteRGBImage(const TImage* const input, const std::string& filename,
+                   typename std::enable_if<Helpers::HasBracketOperator<typename TImage::PixelType>::value>::type* = 0)
 {
-  static_assert(Helpers::HasBracketOperator<typename TImage::PixelType>::value,
-                "WriteRGBImage requires the pixels to have an operator[]!");
-
   typedef itk::Image<itk::CovariantVector<unsigned char, 3>, 2> RGBImageType;
 
   RGBImageType::Pointer output = RGBImageType::New();
@@ -1714,6 +1770,37 @@ void WriteRGBImage(const TImage* const input, const std::string& filename)
     for(unsigned int i = 0; i < 3; ++i)
       {
       pixel[i] = inputIterator.Get()[i];
+      }
+    outputIterator.Set(pixel);
+    ++inputIterator;
+    ++outputIterator;
+    }
+
+  typename itk::ImageFileWriter<RGBImageType>::Pointer writer = itk::ImageFileWriter<RGBImageType>::New();
+  writer->SetFileName(filename);
+  writer->SetInput(output);
+  writer->Update();
+}
+
+template <typename TImage>
+void WriteRGBImage(const TImage* const input, const std::string& filename,
+                   typename std::enable_if<!Helpers::HasBracketOperator<typename TImage::PixelType>::value>::type* = 0)
+{
+  typedef itk::Image<itk::CovariantVector<unsigned char, 3>, 2> RGBImageType;
+
+  RGBImageType::Pointer output = RGBImageType::New();
+  output->SetRegions(input->GetLargestPossibleRegion());
+  output->Allocate();
+
+  itk::ImageRegionConstIterator<TImage> inputIterator(input, input->GetLargestPossibleRegion());
+  itk::ImageRegionIterator<RGBImageType> outputIterator(output, output->GetLargestPossibleRegion());
+
+  while(!inputIterator.IsAtEnd())
+    {
+    itk::CovariantVector<unsigned char, 3> pixel;
+    for(unsigned int i = 0; i < 3; ++i)
+      {
+      pixel[i] = inputIterator.Get(); // This is the only line that is different from the version that requires pixels to have operator[]
       }
     outputIterator.Set(pixel);
     ++inputIterator;
@@ -2028,13 +2115,17 @@ void VectorImageToRGBImageInRegion(const TImage* const image, RGBImageType* cons
                                    const itk::ImageRegion<2>& region)
 {
   // Only the first 3 components are used (assumed to be RGB)
-  rgbImage->SetRegions(region);
-  rgbImage->Allocate();
+
+  if(rgbImage->GetLargestPossibleRegion() != image->GetLargestPossibleRegion())
+  {
+    rgbImage->SetRegions(image->GetLargestPossibleRegion());
+    rgbImage->Allocate();
+  }
 
   itk::ImageRegionConstIteratorWithIndex<TImage> inputIterator(image, region);
 
   while(!inputIterator.IsAtEnd())
-    {
+  {
     typename TImage::PixelType inputPixel = inputIterator.Get();
     RGBImageType::PixelType outputPixel;
     outputPixel.SetRed(inputPixel[0]);
@@ -2043,7 +2134,7 @@ void VectorImageToRGBImageInRegion(const TImage* const image, RGBImageType* cons
 
     rgbImage->SetPixel(inputIterator.GetIndex(), outputPixel);
     ++inputIterator;
-    }
+  }
 }
 
 template <typename TImage>
