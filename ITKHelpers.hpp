@@ -983,7 +983,7 @@ void StackImages(const typename itk::VectorImage<TPixel, 2>* const image1,
                  const typename itk::VectorImage<TPixel, 2>* const image2,
                  typename itk::VectorImage<TPixel, 2>* const output)
 {
-  typedef typename itk::VectorImage<TPixel, 2> VectorImageType;
+  //typedef typename itk::VectorImage<TPixel, 2> VectorImageType;
   typedef typename itk::Image<TPixel, 2> ScalarImageType;
 
   if(image1->GetLargestPossibleRegion() != image2->GetLargestPossibleRegion())
@@ -1348,7 +1348,7 @@ void SubtractRegions(const TImage* const image1, const itk::ImageRegion<2>& regi
     float difference = image1Iterator.Get() - image2Iterator.Get();
     itk::Index<2> index = Helpers::ConvertFrom<itk::Index<2>, itk::Offset<2> >
                           (image1Iterator.GetIndex() - image1->GetLargestPossibleRegion().GetIndex());
-    output.SetPixel(index, difference);
+    output->SetPixel(index, difference);
     ++image1Iterator;
     ++image2Iterator;
     }
@@ -1551,7 +1551,7 @@ template<typename TInputPixel, typename TOutputPixel, unsigned int NComponents>
 void ConvertTo3Channel(const itk::Image<itk::CovariantVector<TInputPixel, NComponents> >* const image,
                        itk::Image<itk::CovariantVector<TOutputPixel, 3> >* const output)
 {
-  typedef itk::Image<itk::CovariantVector<TInputPixel, NComponents> > InputImageType;
+  //typedef itk::Image<itk::CovariantVector<TInputPixel, NComponents> > InputImageType;
   typedef itk::Image<itk::CovariantVector<TOutputPixel, 3> > OutputImageType;
 
   if(image->GetNumberOfComponentsPerPixel() == 3)
@@ -1605,7 +1605,7 @@ template<typename TPixel>
 void ConvertTo3Channel(const itk::VectorImage<TPixel, 2>* const image,
                       typename itk::VectorImage<TPixel, 2>* const output)
 {
-  typedef itk::VectorImage<TPixel, 2> ImageType;
+  //typedef itk::VectorImage<TPixel, 2> ImageType;
 
   if(image->GetNumberOfComponentsPerPixel() == 3)
   {
@@ -1753,7 +1753,7 @@ void WriteImage(const TImage* const image, const std::string& filename)
 
 template <typename TImage>
 void WriteRGBImage(const TImage* const input, const std::string& filename,
-                   typename std::enable_if<Helpers::HasBracketOperator<typename TImage::PixelType>::value>::type* = 0)
+                   typename std::enable_if<Helpers::HasBracketOperator<typename TImage::PixelType>::value>::type*)
 {
   typedef itk::Image<itk::CovariantVector<unsigned char, 3>, 2> RGBImageType;
 
@@ -1784,7 +1784,7 @@ void WriteRGBImage(const TImage* const input, const std::string& filename,
 
 template <typename TImage>
 void WriteRGBImage(const TImage* const input, const std::string& filename,
-                   typename std::enable_if<!Helpers::HasBracketOperator<typename TImage::PixelType>::value>::type* = 0)
+                   typename std::enable_if<!Helpers::HasBracketOperator<typename TImage::PixelType>::value>::type*)
 {
   typedef itk::Image<itk::CovariantVector<unsigned char, 3>, 2> RGBImageType;
 
