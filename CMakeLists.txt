@@ -4,9 +4,8 @@ project(ITKHelpers)
 SET(CMAKE_INCLUDE_CURRENT_DIR ON)
 ENABLE_TESTING() # This has to be in the root directory if we want to run 'ctest' from the root build directory.
 
-<<<<<<< HEAD
+
 add_subdirectory(CMakeHelpers)
-=======
 cmake_minimum_required(VERSION 3.0)
 
 # Only include Helpers if it is not already available
@@ -17,7 +16,6 @@ if(NOT TARGET Helpers)
   set(ITKHelpers_libraries ${ITKHelpers_libraries} Helpers)
   message("ITKHelpers submodule in ${CMAKE_CURRENT_SOURCE_DIR} used Helpers submodule (with includes ${Helpers_includes} ).")
 endif()
->>>>>>> 126e2da
 
 UseSubmodule(Helpers ITKHelpers)
 
