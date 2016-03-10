@@ -20,13 +20,16 @@
 #define ITKHelpers_H
 
 #include "ITKHelpersTypes.h"
+#include "ITKContainerInterface.h"
 
 // Submodules
 class Mask;
+#include "Helpers/Helpers.h"
 #include "Helpers/TypeTraits.h"
 
 // STL
 #include <string>
+#include <type_traits>
 
 // ITK
 #include "itkImage.h"
@@ -36,6 +39,26 @@ class Mask;
 #include "itkSize.h"
 #include "itkVectorImage.h"
 
+// We implement some overload/specializations from Helpers that deal with ITK types
+namespace Helpers
+{
+  /** A specialization of FuzzyCompare (from Helpers) for CovariantVector */
+  template<typename TA, typename TB, unsigned int N>
+  typename std::enable_if<std::numeric_limits<TA>::is_specialized &&
+                          std::numeric_limits<TB>::is_specialized, bool>::type
+  FuzzyCompare(const itk::CovariantVector<TA, N>& a,
+               const itk::CovariantVector<TB, N>& b,
+               const TA& epsilon = std::numeric_limits<TA>::epsilon());
+
+  /** A specialization of FuzzyCompare (from Helpers) for Vector */
+  template<typename TA, typename TB, unsigned int N>
+  typename std::enable_if<std::numeric_limits<TA>::is_specialized &&
+                          std::numeric_limits<TB>::is_specialized, bool>::type
+  FuzzyCompare(const itk::Vector<TA, N>& a,
+               const itk::Vector<TB, N>& b,
+               const TA& epsilon = std::numeric_limits<TA>::epsilon());
+}
+
 namespace ITKHelpers
 {
   using namespace ITKHelpersTypes;
@@ -43,9 +66,43 @@ namespace ITKHelpers
 ///////// Function templates (defined in ITKHelpers.hpp) /////////
 ////////////////////////////////////////////////////////////////////////
 
+/** Get the 4-neighbor indices around 'pixel' that are equal to 'value'. */
+template<typename TImage>
+std::vector<itk::Index<2> > Get4NeighborsWithValue(const TImage* const image,
+                                                   const itk::Index<2>& pixel,
+                                                   const typename TImage::PixelType& value);
+
+/** Determine if any of the 4-neighbor indices around 'pixel' are equal to 'value'. */
+template<typename TImage>
+bool Has4NeighborsWithValue(const TImage* const image,
+                            const itk::Index<2>& pixel,
+                            const typename TImage::PixelType& value);
+
+/** Convert any type with operator[] and two values to any other type with operator[]
+  * an two values (i.e. itk::Index<2> and itk::Offset<2> ).
+  * We place the TInput as the second template paramter because it can be
+  * automatically deduced from the 'object' that is passed. An example call is:
+  * itk::Index<2> index = {{0,0}};
+  * auto offset = ConvertFrom<itk::Offset<2> > (index);
+  */
+template<typename TReturn, typename TInput>
+TReturn Convert2DValue(const TInput& object);
+
+/** Median filter an image. */
 template<typename TImage>
 void MedianFilter(const TImage* const image, const unsigned int kernelRadius,
                   TImage* const output);
+
+/** Compare images pixelwise. */
+template<typename TImage>
+unsigned int CountDifferentPixels(const TImage* const image1,
+                                  const TImage* const image2,
+                                  const float threshold = 0.00001f);
+
+/** Determine if all pixels in region are equal to a specified value. */
+template<typename TImage>
+bool AllPixelsEqualTo(const TImage* const image, const itk::ImageRegion<2>& region,
+                      const typename TImage::PixelType& value);
 
 /** Apply an 'operationFunctor' to all pixels that pass the 'testFunctor'. */
 template <typename TImage, typename TTestFunctor, typename TOperationFunctor>
@@ -307,7 +364,10 @@ template<typename TInputImage, typename TOutputImage>
 void ExtractChannels(const TInputImage* const image, const std::vector<unsigned int> channels,
                     TOutputImage* const output);
 
-/** Extract a region of an image. */
+/** Extract a region of an image. The 'output' image has Index={0,0}, not the index of 'region'.
+  * That is, it creates a new "standalone" image that does not reference the old location/region
+  * in any way.
+  */
 template<typename TImage>
 void ExtractRegion(const TImage* const image, const itk::ImageRegion<2>& region,
                    TImage* const output);
@@ -317,10 +377,22 @@ template<typename TPixel>
 void ScaleChannel(const itk::VectorImage<TPixel, 2>* const image, const unsigned int channel,
                   const TPixel channelMax, typename itk::VectorImage<TPixel, 2>* const output);
 
-/** Force an image to be 3 channels. If it is already 3 channels, copy it through. If it is less than 3 channels. */
+/** Force an image to be 3 channels. If it is already 3 channels, copy it through.
+  * If it has more than 3 channels, extract the first 3.
+  * If it has one channel, copy that channel to the first 3 channels of the output.
+  * If it has 2 or >3 channels, throw an error.
+  */
+template<typename TInputImage, typename TOutputImage>
+void ConvertTo3Channel(const TInputImage* const image, TOutputImage* const output);
+
+template<typename TInputPixel, typename TOutputPixel, unsigned int NComponents>
+void ConvertTo3Channel(const itk::Image<itk::CovariantVector<TInputPixel, NComponents> >* const image,
+                       itk::Image<itk::CovariantVector<TOutputPixel, 3> >* const output);
+
+/** Specialization for VectorImage. */
 template<typename TPixel>
 void ConvertTo3Channel(const typename itk::VectorImage<TPixel, 2>* const image,
-                      typename itk::VectorImage<TPixel, 2>* const output);
+                       typename itk::VectorImage<TPixel, 2>* const output);
 
 /** Replace a channel of an image. */
 template<typename TImage, typename TReplacementImage>
@@ -458,6 +530,9 @@ void SetChannel(TVectorImage* const vectorImage, const unsigned int channel, con
 
 template<typename TImage>
 void ScaleAllChannelsTo255(TImage* const image);
+
+template<typename TImage>
+void ClampAllChannelsTo255(TImage* const image);
 
 template<typename TInputImage,typename TOutputImage>
 void CastImage(const TInputImage* const inputImage, TOutputImage* const outputImage);
@@ -614,9 +689,15 @@ std::vector<itk::Index<2> > BreadthFirstOrderingNonZeroPixels(const TImage* cons
 template <class TImage>
 bool IsClosedLoop(const TImage* const image, const itk::Index<2>& start);
 
-/**  Write the first 3 channels of an image to a file as unsigned chars. */
-template<typename TImage>
-void WriteRGBImage(const TImage* const input, const std::string& filename);
+/**  Write the scalar image to a file as an RGB image (unsigned chars) with 3 identical channels. */
+template <typename TImage>
+void WriteRGBImage(const TImage* const input, const std::string& filename,
+                    typename std::enable_if<!Helpers::HasBracketOperator<typename TImage::PixelType>::value>::type* = 0);
+
+/**  Write the first 3 channels of the image to a file as an RGB image (unsigned chars). */
+template <typename TImage>
+void WriteRGBImage(const TImage* const input, const std::string& filename,
+                   typename std::enable_if<Helpers::HasBracketOperator<typename TImage::PixelType>::value>::type* = 0);
 
 /** Write an image to a file named 'prefix'_'iteration'.extension*/
 template <typename TImage>
@@ -685,7 +766,8 @@ void StackImages(const TImage1* const image1,
                  const TImage2* const image2,
                  TOutputImage* const output);
 
-/** Convert the first 3 channels of a float vector image to an unsigned char/color/rgb image (only in 'region'). */
+/** Convert the first 3 channels of a float vector image to an unsigned char/color/rgb image (only in 'region').
+  * The output image is made to be the same size as the input image.*/
 template <typename TImage>
 void VectorImageToRGBImageInRegion(const TImage* const image, RGBImageType* const rgbImage, const itk::ImageRegion<2>& region);
 
@@ -798,7 +880,7 @@ std::vector<itk::Index<2> > Get8NeighborsInRegion(const itk::ImageRegion<2>& reg
 
 /** Get the neighboring of a 'pixel' (of size 'queryRegionSize') that are inside of a 'searchRegion'. */
 std::vector<itk::ImageRegion<2> > Get8NeighborRegionsInRegion(const itk::ImageRegion<2>& searchRegion, const itk::Index<2>& pixel,
-                                                        const itk::Size<2>& queryRegionSize);
+                                                              const itk::Size<2>& queryRegionSize);
 
 /** The return value MUST be a smart pointer. */
 itk::ImageBase<2>::Pointer CreateImageWithSameType(const itk::ImageBase<2>* input);
@@ -818,16 +900,19 @@ std::vector<itk::Offset<2> > IndicesToOffsets(const std::vector<itk::Index<2> >&
 std::vector<itk::Index<2> > GetBoundaryPixels(const itk::ImageRegion<2>& region);
 
 /** Get the locations of the pixels within 'thickness' on the boundary (interior only) of a region. */
-std::vector<itk::Index<2> > GetBoundaryPixels(const itk::ImageRegion<2>& region, const unsigned int thickness);
+std::vector<itk::Index<2> > GetBoundaryPixels(const itk::ImageRegion<2>& region,
+                                              const unsigned int thickness);
 
 /** Given a list of pixels, form them into an image, dilate the image,
   * and get the list of pixels in the dilated image. */
 std::vector<itk::Index<2> > DilatePixelList(const std::vector<itk::Index<2> >& pixelList,
-                                            const itk::ImageRegion<2>& region, const unsigned int radius);
+                                            const itk::ImageRegion<2>& region,
+                                            const unsigned int radius);
 
 /** Get the region of an image where a patch with radius 'patchRadius' centered on
   * every pixel will be entirely inside 'wholeRegion'. */
-itk::ImageRegion<2> GetInternalRegion(const itk::ImageRegion<2>& wholeRegion, const unsigned int patchRadius);
+itk::ImageRegion<2> GetInternalRegion(const itk::ImageRegion<2>& wholeRegion,
+                                      const unsigned int patchRadius);
 
 /** Get all patches in 'imageRegion' with radius 'patchRadius' that contains a specified 'pixel'. */
 std::vector<itk::ImageRegion<2> > GetAllPatchesContainingPixel(const itk::Index<2>& pixel,
@@ -835,7 +920,8 @@ std::vector<itk::ImageRegion<2> > GetAllPatchesContainingPixel(const itk::Index<
                                                                const itk::ImageRegion<2>& imageRegion);
 
 /** Get all patches with radius 'patchRadius'. */
-std::vector<itk::ImageRegion<2> > GetAllPatches(const itk::ImageRegion<2>& region, const unsigned int patchRadius);
+std::vector<itk::ImageRegion<2> > GetAllPatches(const itk::ImageRegion<2>& region,
+                                                const unsigned int patchRadius);
 
 /** Get the regions of patches surrounding every pixel in 'indices'. */
 std::vector<itk::ImageRegion<2> > GetPatchesCenteredAtIndices(const std::vector<itk::Index<2> >& indices,
@@ -847,7 +933,8 @@ std::vector<itk::ImageRegion<2> > GetValidPatchesCenteredAtIndices(const std::ve
                                                                    const unsigned int patchRadius);
 
 /** Find which location in 'pixels' is closest to 'queryPixel'. */
-unsigned int ClosestIndexId(const std::vector<itk::Index<2> >& pixels, const itk::Index<2>& queryPixel);
+unsigned int ClosestIndexId(const std::vector<itk::Index<2> >& pixels,
+                            const itk::Index<2>& queryPixel);
 
 /** Subtract 1 if necessary from each or either component to make both components even. */
 itk::Size<2> MakeSizeEven(const itk::Size<2>& inputSize);
@@ -872,7 +959,8 @@ itk::ImageIOBase::IOComponentType GetPixelTypeFromFile(const std::string& filena
 /** Paraview requires 3D vectors to display glyphs, even if the vectors are really 2D.
     These functions appends a 0 to each vectors of a 2D vector image so that it can be
     easily visualized with Paraview. */
-void Write2DVectorRegion(const FloatVector2ImageType* const image, const itk::ImageRegion<2>& region,
+void Write2DVectorRegion(const FloatVector2ImageType* const image,
+                         const itk::ImageRegion<2>& region,
                          const std::string& filename);
 
 /** Calls Write2DVectorRegion on a full image. */
@@ -888,25 +976,31 @@ itk::ImageRegion<2> DilateRegion(const itk::ImageRegion<2>& region, const unsign
 itk::ImageRegion<2> ErodeRegion(const itk::ImageRegion<2>& region, const unsigned int radius);
 
 /** Write an image where the pixels in 'regions' have been colored. */
-void HighlightAndWriteRegions(const itk::Size<2>& imageSize, const std::vector<itk::ImageRegion<2> >& regions, const std::string& filename);
+void HighlightAndWriteRegions(const itk::Size<2>& imageSize,
+                              const std::vector<itk::ImageRegion<2> >& regions,
+                              const std::string& filename);
 
 /** Convert an itk::Index to an itk::Offset simply by copying the [0] and [1] values. */
 itk::Offset<2> IndexToOffset(const itk::Index<2>& index);
 
 /** Crop region with a region as if it were in a different position. */
-itk::ImageRegion<2> CropRegionAtPosition(itk::ImageRegion<2> regionToCrop, const itk::ImageRegion<2>& fullRegion, itk::ImageRegion<2> cropPosition);
+itk::ImageRegion<2> CropRegionAtPosition(itk::ImageRegion<2> regionToCrop,
+                                         const itk::ImageRegion<2>& fullRegion,
+                                         itk::ImageRegion<2> cropPosition);
 
 /** Write a bool image as a black/white image. */
 void WriteBoolImage(const itk::Image<bool, 2>* const image, const std::string& fileName);
 
 /** Write an image of indices as a vector image. */
-void WriteIndexImage(const itk::Image<itk::Index<2>, 2>* const image, const std::string& fileName);
+void WriteIndexImage(const itk::Image<itk::Index<2>, 2>* const image,
+                     const std::string& fileName);
 
 /** Divide a 'region' into a number of subregions. For example, if 'region' is 10x10 and 'divisionsPerDimension' is 2, the function
   * will produce 4 5x5 regions. NOTE: if the region is not exactly divisible in each dimension by 'divisionsPerDimension', some pixels
   * (at the end of the region) will not be used. For example, if 'region' is 11x11 and 'divisionsPerDimension' is 2, the last row and last
   * column will not be included at all in the returned regions. */
-std::vector<itk::ImageRegion<2> > DivideRegion(const itk::ImageRegion<2>& region, const unsigned int divisionsPerDimension);
+std::vector<itk::ImageRegion<2> > DivideRegion(const itk::ImageRegion<2>& region,
+                                               const unsigned int divisionsPerDimension);
 
 namespace detail
 {
@@ -917,7 +1011,7 @@ namespace detail
                       TOutputImage* const output);
 }
 
-}// end namespace
+}// end namespace ITKHelpers
 
 #include "ITKHelpers.hpp"
 

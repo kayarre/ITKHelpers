@@ -303,11 +303,7 @@ std::vector<itk::Index<2> > Get8NeighborsInRegion(const itk::ImageRegion<2>& reg
     itk::Index<2> index = pixel + offset;
     if(region.IsInside(index))
     {
-    itk::Index<2> index = pixel + neighborOffsets[i];
-    if(region.IsInside(index))
-      {
       neighborsInRegion.push_back(index);
-      }
     }
   }
   return neighborsInRegion;
